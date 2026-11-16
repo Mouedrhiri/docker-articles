@@ -18,3 +18,5 @@ J'ai ensuite exécuté Trivy sur les deux images publiées. Le Web présente 147
 J'ai poussé le code sur github.com/Mouedrhiri/docker-articles et configuré les secrets Docker Hub. Une première exécution du workflow a échoué pendant la préparation à cause d'une référence Trivy inexistante. J'ai corrigé cette référence vers le commit officiel de v0.36.0. Les exécutions sont consultables dans Actions. La correction des vulnérabilités détectées reste à effectuer.
 
 Sur mon environnement Podman, j'utilise DOCKER_API_VERSION=1.44 pour la compatibilité du client Compose. Les healthchecks sont déclarés dans Compose afin de fonctionner aussi avec les images au format OCI.
+
+J'ai corrigé l'échec de démarrage Apache en configurant APACHE_PID_FILE=/tmp/apache2/apache2.pid dans Compose. Les logs GitHub montraient une tentative d'écriture sur /var/run/apache2 en lecture seule. Après correction, le déploiement local atteint healthy et les tests HTTP passent. J'ai vérifié que le fichier PID existe sous /tmp/apache2 et contient 1.

@@ -48,7 +48,7 @@ page()
 
 title('Sécurité, réseau et persistance')
 sub('5. Mes choix de sécurité')
-p("J'exécute le Web avec www-data, read_only: true, cap_drop: ALL et no-new-privileges. Les fichiers temporaires PHP et Apache sont placés dans un tmpfs sous /tmp. Son mode 1777 correspond au fonctionnement habituel d'un répertoire temporaire avec sticky bit. Je n'applique aucun chmod 777 au code ni aux données : il permettrait à tous les utilisateurs de les modifier.")
+p("J'exécute le Web avec www-data, read_only: true, cap_drop: ALL et no-new-privileges. Les fichiers temporaires PHP et Apache sont placés dans un tmpfs sous /tmp. J'ai aussi fixé APACHE_PID_FILE à /tmp/apache2/apache2.pid pour éviter une écriture du PID dans /var/run/apache2, qui reste en lecture seule. Son mode 1777 correspond au fonctionnement habituel d'un répertoire temporaire avec sticky bit. Je n'applique aucun chmod 777 au code ni aux données : il permettrait à tous les utilisateurs de les modifier.")
 p("J'ai prévu scripts/setup.py pour générer deux mots de passe aléatoires sans remplacer les secrets existants. Ces fichiers sont exclus de Git, du contexte Docker et du ZIP. Compose les monte en lecture seule. Ils ne sont pas chiffrés au repos : je dois donc aussi protéger l'accès au dossier hôte. Le compte applicatif est distinct de root et limité à sa base.")
 p("J'ai conservé les requêtes préparées PDO et ajouté utf8mb4, la validation des types et des longueurs, les jetons CSRF et l'échappement HTML. Les erreurs détaillées sont envoyées dans les logs. Les cookies de session utilisent HttpOnly et SameSite. Pour un déploiement sur Internet, je prévoirais également HTTPS et les contrôles d'accès adaptés.")
 sub('6. Communication entre les services')

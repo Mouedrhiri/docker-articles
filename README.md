@@ -80,7 +80,7 @@ Je vérifie la connexion SQL avec PDO et, si nécessaire, une connexion TCP. `cu
 ## Sécurité et optimisation
 
 - J'exécute le Web sous `www-data`, avec une racine en lecture seule, `cap_drop: ALL` et `no-new-privileges`.
-- J'utilise le port interne 8080 pour éviter un port privilégié. Les fichiers temporaires PHP et Apache sont placés dans `/tmp` en tmpfs.
+- J'utilise le port interne 8080 pour éviter un port privilégié. Les fichiers temporaires PHP et Apache sont placés dans `/tmp` en tmpfs. Je fixe aussi `APACHE_PID_FILE=/tmp/apache2/apache2.pid` pour conserver le PID dans ce répertoire inscriptible malgré `read_only: true`.
 - Je conserve l'entrypoint officiel MariaDB : il prépare le volume puis abandonne les privilèges root pour le serveur.
 - J'utilise des requêtes préparées, utf8mb4, l'échappement HTML, la validation serveur et un jeton CSRF. Les cookies sont HttpOnly/SameSite et les erreurs détaillées restent dans les logs.
 - Je n'applique aucun `chmod 777` au code ou aux données, car cela autoriserait tous les utilisateurs à les modifier.
