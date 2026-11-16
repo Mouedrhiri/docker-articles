@@ -1,16 +1,20 @@
-Validation locale du 16 novembre 2026, Windows / conteneurs Linux amd64 via Podman 5.7.1 et Docker Compose standalone 5.0.2.
-- Construction image Web PHP/Apache : reussie.
-- Construction image MariaDB : reussie.
-- docker-compose config --quiet : reussi.
-- php -l : les quatre fichiers PHP sont valides.
-- Tests HTTP reels : sante, liste, creation, methode 405, CSRF 403, champs invalides 422, longueur et echappement XSS : reussis.
-- Web execute avec uid=33(www-data), racine read_only et cap_drop ALL.
-- SQL initialise sur volume neuf ; connexion PDO entre services fonctionnelle.
-- Tailles locales : PHP base 509332368 octets ; Web 509645356 ; DB 340532266.
-- Persistance : voir resultat du test ajoute ci-dessous.
-Limites : scan Trivy non execute localement ; workflow GitHub Actions non execute a distance. Les jobs et procedures sont fournis. Aucun resultat de scan ni de publication n est invente.
-Compatibilite locale : DOCKER_API_VERSION=1.44 est necessaire avec le client Docker/Compose recent face au socket Podman de cette machine. Aucun reglage de ce type n est requis pour Docker Desktop standard. Les healthchecks sont declares dans Compose car les builds Podman au format OCI ignorent ceux des Dockerfiles.
+Mes vérifications — 16 novembre 2026
 
-Resultat final : apres docker-compose down puis recreation, les deux services sont healthy et python tests/smoke.py --persistence passe. L article marque a ete conserve. Healthcheck HTTP curl valide sur la stack.
+J'ai utilisé Windows et des conteneurs Linux amd64 avec Podman 5.7.1 et Docker Compose standalone 5.0.2.
 
-Publication Docker Hub realisee et verifiee sans authentification pour les deux images mouedrhi492/ynov-articles-web et mouedrhi492/ynov-articles-db. Tags latest et 8d39914b870aee697761d49b1a947eefedbd5786. Digests enregistres dans docs/publication.json. La publication a ete faite manuellement via Podman, pas via une execution distante du pipeline.
+J'ai validé :
+- la construction des images PHP/Apache et MariaDB ;
+- docker-compose config --quiet ;
+- la syntaxe des quatre fichiers PHP avec php -l ;
+- les tests HTTP : santé, consultation, création, méthode 405, CSRF 403, champs invalides 422, longueur et échappement XSS ;
+- l'exécution du Web sous uid=33(www-data), avec read_only et cap_drop ALL ;
+- l'initialisation SQL sur un volume neuf et la connexion PDO entre les services ;
+- la persistance de l'article après down puis recréation, avec les deux services healthy.
+
+J'ai publié les images mouedrhi492/ynov-articles-web et mouedrhi492/ynov-articles-db avec latest et le SHA 8d39914b870aee697761d49b1a947eefedbd5786. J'ai vérifié leur accessibilité publique ; les digests sont dans publication.json. J'ai réalisé cette publication manuellement avec Podman.
+
+J'ai ensuite exécuté Trivy sur les deux images publiées. Le Web présente 147 résultats HIGH et 5 CRITICAL, dont 4 critiques avec correctif. MariaDB présente 25 HIGH et 1 CRITICAL, avec correctif. Le scan est terminé, mais le seuil de sécurité CI n'est pas validé. Les rapports complets sont inclus dans docs/.
+
+Je n'ai pas encore exécuté le workflow sur GitHub. La configuration du dépôt distant et de ses secrets, ainsi que la correction des vulnérabilités détectées, restent à effectuer.
+
+Sur mon environnement Podman, j'utilise DOCKER_API_VERSION=1.44 pour la compatibilité du client Compose. Les healthchecks sont déclarés dans Compose afin de fonctionner aussi avec les images au format OCI.

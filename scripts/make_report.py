@@ -1,76 +1,96 @@
-"""Regeneration optionnelle : pip install reportlab ; python scripts/make_report.py."""
+"""Génération du rapport : python scripts/make_report.py (reportlab requis)."""
 from pathlib import Path
 from xml.sax.saxutils import escape
+import json
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import cm
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak, Table, TableStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, PageBreak, Table, TableStyle
 
 root = Path(__file__).resolve().parents[1]
 out = root / 'docs'
 out.mkdir(exist_ok=True)
 styles = getSampleStyleSheet()
-styles['BodyText'].spaceAfter = 10
-styles['BodyText'].leading = 15
+styles['BodyText'].leading = 14
+styles['BodyText'].spaceAfter = 9
 story = []
 def title(text): story.append(Paragraph(escape(text), styles['Heading1']))
 def sub(text): story.append(Paragraph(escape(text), styles['Heading2']))
 def p(text): story.append(Paragraph(escape(text), styles['BodyText']))
 def page(): story.append(PageBreak())
 
-title('Conteneurisation d une application Web multi-tiers')
-p('Projet M2 - Docker / Ynov - 16 novembre 2026')
-p('Application Articles : PHP 8.2, Apache et MariaDB 11.4. Rapport technique accompagne du code source, des Dockerfiles, de Docker Compose, des tests HTTP et du pipeline GitHub Actions.')
+title("Conteneurisation d'une application Web multi-tiers")
+p('Projet M2 — Docker / Ynov — 16 novembre 2026')
+p("Dans ce projet, j'ai conteneurisé l'application Articles avec PHP 8.2, Apache et MariaDB 11.4. Mon objectif était de séparer l'application de sa base de données, de conserver les articles entre les redémarrages et de préparer une chaîne de construction, de test et de publication des images.")
 sub('1. Analyse et architecture')
-p('Les sources initiales comportent un formulaire, une liste d articles et un traitement PHP par requete preparee. La connexion utilisait localhost et des identifiants fixes ; le SQL creait un utilisateur limite a localhost. Dans des conteneurs distincts, localhost designe chaque conteneur : le Web doit joindre le nom de service db. La gestion du compte SQL est deleguee a l entrypoint MariaDB officiel.')
-data = [[Paragraph('<b>Navigateur</b><br/>http://localhost:8080', styles['BodyText'])], ['HTTP via port publie 8080 -> 8080'], [Paragraph('<b>web : Apache / PHP 8.2</b><br/>Utilisateur www-data (UID 33)<br/>Formulaire + traitement backend PHP', styles['BodyText'])], ['PDO / TCP 3306 / DNS : db'], [Paragraph('<b>db : MariaDB 11.4</b><br/>Base articles / compte articles_app', styles['BodyText'])], ['Volume nomme db-data : /var/lib/mysql']]
-t = Table(data, colWidths=[16*cm]); t.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,-1),colors.HexColor('#edf5f2')),('BOX',(0,0),(-1,-1),1,colors.HexColor('#236a60')),('TOPPADDING',(0,0),(-1,-1),9),('BOTTOMPADDING',(0,0),(-1,-1),9)])); story.append(t)
-p('Le bridge personnalise app-network relie web et db. Seul le port Web est publie, sur 127.0.0.1. La base n expose aucun port sur l hote. Les secrets sont montes en fichiers dans /run/secrets. Aucun service d administration optionnel n est ajoute.')
+p("J'ai commencé par analyser les sources PHP et le script SQL fournis. L'application permet de publier et de consulter des articles. La connexion initiale utilisait localhost et des identifiants fixes. J'ai remplacé cette configuration par des paramètres d'environnement et des secrets fichiers. Depuis le conteneur Web, j'utilise le nom DNS db pour joindre MariaDB.")
+p("J'ai retenu deux services : web pour Apache, l'interface et le traitement PHP ; db pour MariaDB. Ce découpage conserve la structure de l'application fournie tout en isolant les données du serveur Web.")
+data = [['Navigateur : http://localhost:8080'], ['HTTP : port hôte 8080 vers port conteneur 8080'], ['web : Apache + PHP 8.2 / www-data (UID 33)'], ['Réseau bridge app-network / PDO vers db:3306'], ['db : MariaDB 11.4 / base articles / compte articles_app'], ['Volume persistant db-data : /var/lib/mysql']]
+t = Table(data, colWidths=[16*cm])
+t.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,-1),colors.HexColor('#edf5f2')),('BOX',(0,0),(-1,-1),1,colors.HexColor('#236a60')),('TOPPADDING',(0,0),(-1,-1),10),('BOTTOMPADDING',(0,0),(-1,-1),10)]))
+story.append(t)
+p("J'ai publié uniquement le port Web sur 127.0.0.1. La base ne possède aucun port publié sur l'hôte. Les deux services communiquent sur le bridge personnalisé app-network et les secrets sont montés sous /run/secrets.")
 page()
+
 title('Construction et orchestration')
-sub('2. Dockerfile Web : justification des instructions')
-for text in [
-'FROM php:8.2-apache AS extensions : base officielle avec serveur Apache et environnement de compilation PHP. RUN docker-php-ext-install compile mysqli et pdo_mysql.',
-'FROM php:8.2-apache AS runtime puis COPY --from : conserve les extensions compilees et leur activation sans les residus de compilation. La base commune conserve toutefois ses outils : ce choix ne permet pas de pretendre a une forte reduction de taille.',
-'RUN : active php.ini-production, masque la version PHP et la signature Apache, configure les sessions et change l ecoute vers 8080. Aucun paquet apt additionnel ni cache supplementaire n est ajoute.',
-'WORKDIR fixe /var/www/html ; COPY limite le contenu aux sources applicatives, proprietaire root, lisibles par www-data. Le code applicatif ne peut pas se modifier lui-meme.',
-'USER www-data execute Apache sans root. EXPOSE 8080 documente le port interne ; CMD apache2-foreground garde le processus principal au premier plan. HEALTHCHECK interroge une route qui execute une requete SQL : il verifie le chemin HTTP + PHP + schema SQL.'
-]: p(text)
-sub('3. Dockerfile base de donnees')
-p('FROM mariadb:11.4 selectionne la branche officielle. COPY place articles.sql dans /docker-entrypoint-initdb.d. Le script initialise la table dans MARIADB_DATABASE au premier demarrage. HEALTHCHECK utilise healthcheck.sh --connect --innodb_initialized fourni par l image. Le serveur MariaDB abandonne les privileges root apres preparation du volume par l entrypoint ; aucun USER force ne vient casser cette initialisation.')
-sub('4. Sections Docker Compose')
-p('services definit web et db avec build et image pour construction et publication. environment transmet les parametres non secrets et les chemins des fichiers secrets. secrets autorise explicitement les services a lire les fichiers necessaires. ports publie uniquement le Web. depends_on/service_healthy attend une base prete. healthcheck controle les deux services, y compris avec les builds OCI Podman. restart: unless-stopped assure la relance en cas d arret inattendu. networks cree le bridge personnalise. volumes conserve les donnees hors des couches ephemeres.')
-p('Le port interne 8080 est un ecart volontaire au port 80 suggere dans le sujet : il permet une execution non-root sans capacite reseau privilegiee, tout en conservant l URL demandee localhost:8080.')
+sub('2. Mon Dockerfile Web')
+p("J'utilise FROM php:8.2-apache AS extensions pour disposer de la base officielle et compiler mysqli et pdo_mysql avec RUN docker-php-ext-install. Une seconde étape FROM, nommée runtime, récupère les modules et leurs fichiers d'activation avec COPY --from. Cette séparation évite de recopier les résidus de compilation, même si l'image de base conserve certains outils.")
+p("Dans RUN, j'active php.ini-production, je masque les versions PHP et Apache et je configure les sessions. Je fais écouter Apache sur 8080 : ce port permet l'exécution sans root sans ajouter de capacité réseau privilégiée. Je conserve ainsi l'accès demandé sur localhost:8080.")
+p("WORKDIR fixe /var/www/html. COPY copie seulement les sources applicatives avec root comme propriétaire. USER www-data lance Apache sans root. EXPOSE documente le port 8080. CMD apache2-foreground garde le serveur au premier plan. HEALTHCHECK utilise curl pour vérifier une route HTTP qui effectue aussi une requête SQL.")
+p("Je n'installe aucun paquet apt supplémentaire. Je limite le contexte de construction aux sources utiles avec .dockerignore, ce qui exclut notamment les secrets, les archives, les rapports et l'historique Git.")
+sub('3. Mon Dockerfile MariaDB')
+p("J'utilise FROM mariadb:11.4 et COPY pour placer articles.sql dans /docker-entrypoint-initdb.d. L'entrypoint officiel crée la base et le compte applicatif à partir des paramètres MARIADB_DATABASE et MARIADB_USER. Le script initialise ensuite la table articles au premier démarrage sur un volume vide. Le HEALTHCHECK utilise healthcheck.sh --connect --innodb_initialized.")
+p("Je conserve l'entrypoint officiel : il prépare les permissions du volume puis lance le serveur MariaDB sous son utilisateur dédié. Je ne force donc pas un USER qui empêcherait cette préparation.")
+sub('4. Mon fichier Docker Compose')
+p("Dans services, je déclare web et db, leurs contextes build et leurs noms image. environment transmet les paramètres de connexion et les chemins des secrets. secrets autorise chaque service à lire les fichiers nécessaires. ports publie uniquement le Web et depends_on avec service_healthy attend que la base soit prête.")
+p("J'ai ajouté les healthchecks dans Compose pour leur utilisation avec Podman comme avec Docker. restart: unless-stopped gère les redémarrages, networks définit le bridge et volumes déclare db-data pour conserver les données en dehors des conteneurs.")
 page()
-title('Securite, reseau et optimisation')
-sub('5. Mesures de securite')
-p('Le Web utilise read_only: true, cap_drop: ALL et no-new-privileges. Un tmpfs /tmp fournit les fichiers temporaires PHP et les repertoires Apache configures sous /tmp/apache2. Son mode 1777 est le mode temporaire standard avec sticky bit : les utilisateurs ne peuvent pas supprimer les fichiers des autres. Aucun chmod 777 n est applique au code ou aux donnees.')
-p('Les mots de passe sont generes aleatoirement par scripts/setup.py, preserves entre lancements et exclus de Git, du contexte Docker et du ZIP. Compose les monte en lecture seule. Les fichiers locaux ne sont pas chiffres au repos : leur protection depend aussi des permissions du dossier hote. Le compte applicatif est distinct de root et limite a sa base.')
-p('L application utilise des requetes preparees PDO, utf8mb4, une validation serveur des types et longueurs, des jetons CSRF et un echappement HTML systematique. Les erreurs techniques vont dans les logs ; les utilisateurs recoivent des erreurs generiques. Les cookies sont HttpOnly/SameSite. Une mise en production exposant Internet doit ajouter HTTPS et les politiques d acces adaptees.')
-sub('6. Communication et persistance')
-p('Le DNS Compose resout db depuis web. Le controle TCP utilise fsockopen(db, 3306) ; le healthcheck PDO confirme une vraie operation SQL. curl http://db:3306 n est pas pertinent car MySQL ne parle pas HTTP. Le bridge limite la communication au reseau rejoint, sans constituer a lui seul un pare-feu applicatif entre les deux services.')
-p('docker compose down retire les conteneurs et le reseau, mais conserve db-data. Le test de persistance cree un article marque, recree les conteneurs et retrouve exactement ce marqueur. down -v est reserve a une reinitialisation volontaire car il detruit les donnees. Les variables d initialisation ne modifient pas un compte SQL deja present dans le volume.')
-sub('7. Mesure des images')
-p('Mesures locales linux/amd64 avec podman image inspect, tailles non compressees : base php:8.2-apache = 509 332 368 octets ; Web final = 509 645 356 octets ; DB finale = 340 532 266 octets. Le surcout Web est de 312 988 octets, environ 0,06 %. Cette comparaison base/final n est pas une mesure avant/apres d une application monolithique : aucune telle image initiale n etait fournie. Aucun gain fictif n est annonce.')
-p('Le multi-stage isole la compilation ; .dockerignore restreint le contexte aux sources utiles. Les tags recoivent des correctifs, mais restent mutables : figer les digests apres scan serait necessaire pour un deploiement strictement reproductible. Le pipeline Trivy bloque les critiques corrigeables ; un scan complet reste requis pour les vulnerabilites sans correctif.')
+
+title('Sécurité, réseau et persistance')
+sub('5. Mes choix de sécurité')
+p("J'exécute le Web avec www-data, read_only: true, cap_drop: ALL et no-new-privileges. Les fichiers temporaires PHP et Apache sont placés dans un tmpfs sous /tmp. Son mode 1777 correspond au fonctionnement habituel d'un répertoire temporaire avec sticky bit. Je n'applique aucun chmod 777 au code ni aux données : il permettrait à tous les utilisateurs de les modifier.")
+p("J'ai prévu scripts/setup.py pour générer deux mots de passe aléatoires sans remplacer les secrets existants. Ces fichiers sont exclus de Git, du contexte Docker et du ZIP. Compose les monte en lecture seule. Ils ne sont pas chiffrés au repos : je dois donc aussi protéger l'accès au dossier hôte. Le compte applicatif est distinct de root et limité à sa base.")
+p("J'ai conservé les requêtes préparées PDO et ajouté utf8mb4, la validation des types et des longueurs, les jetons CSRF et l'échappement HTML. Les erreurs détaillées sont envoyées dans les logs. Les cookies de session utilisent HttpOnly et SameSite. Pour un déploiement sur Internet, je prévoirais également HTTPS et les contrôles d'accès adaptés.")
+sub('6. Communication entre les services')
+p("Le service web résout db grâce au DNS du réseau Compose. Le healthcheck vérifie le parcours HTTP, PHP puis SQL. Pour un contrôle réseau isolé, je peux vérifier la résolution avec getent hosts db et ouvrir une connexion TCP sur db:3306. Je n'utilise pas curl http://db:3306 car MySQL ne parle pas HTTP.")
+sub('7. Vérification de la persistance')
+p("J'ai ajouté un article portant un marqueur unique, exécuté docker compose down puis recréé les conteneurs. Le test a retrouvé le même article : le volume db-data conserve donc les données. Je réserve down -v à une réinitialisation volontaire, car cette commande supprime le volume.")
+p("Les paramètres d'initialisation MariaDB ne sont appliqués que sur un volume vide. Pour changer le mot de passe d'un compte déjà créé, je dois effectuer une rotation SQL coordonnée ; modifier seulement le fichier secret ne suffit pas.")
 page()
-title('Automatisation, validation et demonstration')
-sub('8. Pipeline CI/CD et publication')
-p('Le workflow GitHub Actions se declenche sur push main/master, pull_request ou lancement manuel. Il genere la configuration, valide Compose, construit les deux images, controle php -l, demarre les services, execute les tests HTTP puis recree les conteneurs pour prouver la persistance. Trivy analyse ensuite les images Web et DB. Les logs sont collectes et les ressources CI nettoyees meme en cas d echec.')
-p('La publication depend du succes du job de test et ne se produit pas pour une PR. docker/login-action utilise les secrets GitHub DOCKERHUB_USERNAME et DOCKERHUB_TOKEN. docker/build-push-action publie les deux images avec latest et le SHA complet du commit. Creer les deux depots publics sur le compte personnel avant execution. Les deux images ont ete publiees manuellement sur Docker Hub sous mouedrhi492 avec les tags latest et 8d39914b870aee697761d49b1a947eefedbd5786. Leur accessibilite publique et leurs digests sont verifies dans docs/publication.json. Le depot GitHub distant et une execution distante du workflow restent a realiser.')
-sub('9. Validation locale')
-validation = out / 'validation.txt'
-p(validation.read_text(encoding='utf-8') if validation.exists() else 'Voir docs/validation.txt pour les verifications reellement executees et leurs limites.')
-sub('10. Demonstration et reprise')
-p('1. Executer python scripts/setup.py puis docker compose up -d --build --wait. 2. Montrer docker compose ps et le site localhost:8080. 3. Ajouter un article et le retrouver. 4. Executer down puis up -d --wait et constater la persistance. 5. Presenter le reseau, le volume, USER www-data, les secrets et le workflow. README.md contient les commandes exactes et les procedures de scan et publication.')
-sub('References officielles')
+
+title('Optimisation et analyse de vulnérabilités')
+sub('8. Mesure des images')
+p("J'ai relevé les tailles locales non compressées sur linux/amd64 avec podman image inspect : 509 332 368 octets pour php:8.2-apache, 509 645 356 octets pour l'image Web initialement testée et 340 532 266 octets pour l'image MariaDB initialement testée. Le surcoût Web mesuré est de 312 988 octets, soit environ 0,06 %.")
+p("Cette mesure compare la base PHP à mon image applicative ; elle ne représente pas un avant/après d'une ancienne image monolithique, puisqu'aucune image de ce type n'était fournie. Mon optimisation porte sur le contexte de construction, l'isolation de la compilation et l'absence de dépendances supplémentaires inutiles. Pour rendre une livraison strictement reproductible, je figerais également les digests des bases après vérification.")
+sub('9. Analyse Trivy')
+summary_file = out / 'trivy-summary.json'
+if summary_file.exists():
+    summary = json.loads(summary_file.read_text(encoding='utf-8'))
+    p("J'ai exécuté Trivy sur les deux images publiées sur Docker Hub. J'ai utilisé le scanner de vulnérabilités avec le filtre HIGH,CRITICAL. Les rapports JSON complets sont inclus dans docs/trivy-web.json et docs/trivy-db.json.")
+    for name, result in summary.items():
+        p(f"Image {name} : {result['high']} vulnérabilité(s) HIGH et {result['critical']} CRITICAL détectée(s), dont {result['fixable_critical']} critique(s) disposant d'une version corrigée. Résultat du seuil utilisé en CI (aucune critique corrigeable) : {result['gate']}.")
+    p("Ces résultats correspondent aux images et à la base de vulnérabilités utilisées au moment du scan. Je prévois de reconstruire les images avec les correctifs disponibles puis de relancer l'analyse avant une nouvelle livraison. La réussite technique du scan ne signifie pas automatiquement l'absence de vulnérabilité.")
+else:
+    p("J'ai prévu l'analyse des images avec Trivy dans le pipeline. Le résultat local est à compléter à partir des rapports de scan avant de conclure sur les vulnérabilités détectées.")
+p("Dans le workflow, j'ai configuré un blocage sur les vulnérabilités CRITICAL disposant d'un correctif. Les vulnérabilités sans correctif restent à examiner ; ce seuil ne remplace donc pas la lecture du rapport complet.")
+page()
+
+title('CI/CD, publication et bilan')
+sub('10. Mon pipeline GitHub Actions')
+p("J'ai préparé un workflow déclenché sur push main/master, pull_request ou lancement manuel. Il construit les deux images, vérifie la syntaxe PHP, démarre la stack, exécute les tests HTTP et contrôle la persistance après recréation des conteneurs. Il lance ensuite Trivy sur les deux images. Les logs sont affichés et les ressources de test sont nettoyées même en cas d'échec.")
+p("J'ai séparé la publication dans un job dépendant du succès des tests. Ce job n'est pas lancé sur une pull request. Il utilise DOCKERHUB_USERNAME et DOCKERHUB_TOKEN dans les secrets GitHub, puis publie latest et le SHA complet du commit. La création du dépôt GitHub distant, la configuration de ces secrets et une première exécution distante restent à effectuer.")
+sub('11. Publication Docker Hub')
+p("J'ai publié les deux images sur mon compte mouedrhi492 : mouedrhi492/ynov-articles-web et mouedrhi492/ynov-articles-db. Les tags disponibles sont latest et 8d39914b870aee697761d49b1a947eefedbd5786. J'ai vérifié leur accessibilité publique ; les digests sont enregistrés dans docs/publication.json. Cette publication a été réalisée manuellement avec Podman.")
+sub('12. Bilan des vérifications')
+p("J'ai validé la construction des deux images, la configuration Compose et la syntaxe des quatre fichiers PHP. Les tests HTTP passent pour la santé, la lecture, la création, les champs obligatoires, la longueur, le refus des méthodes non autorisées, le CSRF et l'échappement XSS. J'ai également contrôlé l'utilisateur www-data et la conservation de l'article après recréation des conteneurs.")
+p("Pour ma démonstration, je présente l'architecture, je lance la stack, je publie un article puis je recrée les conteneurs pour montrer la persistance. Je termine avec les protections Docker, le résultat Trivy et la structure du pipeline. Les commandes de reproduction sont regroupées dans README.md.")
+sub('Références officielles')
 for url in ['https://hub.docker.com/_/php','https://hub.docker.com/_/mariadb','https://docs.docker.com/compose/how-tos/use-secrets/','https://docs.docker.com/compose/']:
     p(url)
-
 def footer(canvas, doc):
     canvas.setFont('Helvetica', 9)
     canvas.setFillColor(colors.grey)
-    canvas.drawString(2*cm, 1.25*cm, 'Projet Docker Ynov - Rapport technique')
+    canvas.drawString(2*cm, 1.25*cm, 'Projet Docker Ynov — Rapport technique')
     canvas.drawRightString(19*cm, 1.25*cm, str(doc.page))
-SimpleDocTemplate(str(out / 'Rapport-technique.pdf'), rightMargin=2*cm, leftMargin=2*cm, topMargin=1.8*cm, bottomMargin=2*cm).build(story, onFirstPage=footer, onLaterPages=footer)
-print('Rapport cree : docs/Rapport-technique.pdf')
+SimpleDocTemplate(str(out / 'Rapport-technique.pdf'), rightMargin=2*cm, leftMargin=2*cm, topMargin=1.7*cm, bottomMargin=1.8*cm).build(story, onFirstPage=footer, onLaterPages=footer)
+print('Rapport créé : docs/Rapport-technique.pdf')

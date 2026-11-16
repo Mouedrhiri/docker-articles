@@ -1,146 +1,143 @@
-# Projet Docker Ynov - application Articles
+# Projet Docker Ynov — Application Articles
 
-Application PHP fournie adaptee a une architecture Apache/PHP + MariaDB, avec stockage persistant, secrets, controles de sante et CI/CD.
+J'ai conteneurisé l'application PHP fournie en séparant le service Web de la base MariaDB. J'ai ajouté la persistance, les secrets, les contrôles de santé, les protections applicatives et un pipeline GitHub Actions.
 
-## Demarrage rapide
+## Lancement
 
-Prerequis : Docker Desktop demarre avec les conteneurs Linux, Docker Compose v2+, Python 3 pour initialiser les secrets et lancer les tests.
-
-Depuis le dossier extrait du ZIP :
+J'utilise des conteneurs Linux avec Docker Compose v2+ et Python 3 pour initialiser les secrets et lancer les tests. Le premier build nécessite une connexion Internet.
 
 ```powershell
 python scripts/setup.py
 docker compose up -d --build --wait
 ```
 
-Ouvrir **http://localhost:8080**. Si votre installation fournit `docker-compose` au lieu de `docker compose`, remplacer ce prefixe dans les commandes. Les secrets sont generes une seule fois, jamais embarques dans une image ou dans le ZIP. Le premier build necessite Internet et peut prendre plusieurs minutes.
+L'application est accessible sur **http://localhost:8080**.
 
-## Architecture
+J'ai également publié les images sur Docker Hub. Pour les utiliser sans compiler :
+
+```powershell
+python scripts/setup.py
+docker compose pull
+docker compose up -d --no-build --wait
+```
+
+Sur mon environnement Windows avec Podman et Docker Compose standalone, j'utilise `docker-compose` à la place de `docker compose` et je définis `$env:DOCKER_API_VERSION='1.44'` dans PowerShell. Ce réglage concerne mon environnement local.
+
+## Architecture retenue
 
 ```mermaid
 flowchart LR
-    Browser[Navigateur localhost:8080] -->|HTTP| Web[web : Apache + PHP 8.2 / UID 33 / port 8080]
-    Web -->|PDO MySQL / DNS db:3306| DB[db : MariaDB 11.4]
+    Browser[Navigateur localhost:8080] -->|HTTP| Web[web : Apache + PHP 8.2 / port 8080]
+    Web -->|PDO / db:3306| DB[db : MariaDB 11.4]
     DB --> Volume[(Volume db-data)]
     Secret[Secrets fichiers] -.-> Web
     Secret -.-> DB
 ```
 
-Les deux services partagent le bridge personnalise `app-network`. Seul le Web publie un port, sur la boucle locale de l'hote. La base est accessible par le nom DNS `db` dans le reseau Compose. Front et traitement backend PHP restent dans le meme service Web, conformement au sujet : le decoupage se fait entre application et donnees.
+J'ai conservé l'interface et le traitement PHP dans `web`. Le service `db` héberge MariaDB. Les deux services partagent le bridge personnalisé `app-network`. Seul le Web publie un port, sur la boucle locale de l'hôte. La base est accessible depuis le Web par le nom DNS `db`.
 
 ## Configuration
 
-| Variable .env | Valeur par defaut | Role |
+| Variable .env | Valeur par défaut | Rôle |
 |---|---|---|
-| WEB_PORT | 8080 | Port local HTTP |
-| DB_NAME | articles | Base initialisee |
-| DB_USER | articles_app | Compte applicatif limite a cette base |
-| DOCKERHUB_USERNAME | mouedrhi492 | Prefixe des images |
-| IMAGE_TAG | latest | Tag construit/utilise |
+| WEB_PORT | 8080 | Port HTTP local |
+| DB_NAME | articles | Base initialisée |
+| DB_USER | articles_app | Compte applicatif |
+| DOCKERHUB_USERNAME | mouedrhi492 | Préfixe des images |
+| IMAGE_TAG | latest | Tag utilisé |
 
-`scripts/setup.py` copie `.env.example` vers `.env` et genere deux secrets aleatoires dans `secrets/`. Il preserve les fichiers existants. Ces fichiers restent sur l'hote ; Compose les monte en lecture seule dans `/run/secrets/`. Ce mecanisme local ne chiffre pas les fichiers au repos : proteger l'acces au dossier hote. Les fichiers sont lisibles dans le conteneur par www-data. Ne pas partager les secrets.
+J'ai prévu `scripts/setup.py` pour copier `.env.example` vers `.env` et générer deux secrets aléatoires dans `secrets/`, sans remplacer les fichiers existants. Compose monte ces secrets en lecture seule sous `/run/secrets/`. Ils sont exclus du dépôt, des images et de l'archive. Comme les fichiers hôtes ne sont pas chiffrés, leur accès doit aussi être protégé sur la machine.
 
-Les variables MariaDB et le SQL d'initialisation ne sont appliques qu'a un volume vide. Modifier le mot de passe dans un fichier ne change pas celui d'un compte deja cree : effectuer une rotation SQL coordonnee, ou repartir d'un volume vide uniquement si les donnees peuvent etre perdues.
+Les variables MariaDB et le SQL d'initialisation s'appliquent uniquement à un volume vide. Pour modifier un compte existant, une rotation SQL coordonnée est nécessaire : changer seulement le fichier secret ne change pas le mot de passe stocké dans MariaDB.
 
-## Verification et demonstration
+## Tests et persistance
+
+J'ai vérifié la santé des services, la consultation et la création d'articles, la validation des champs, les longueurs, le CSRF et l'échappement HTML. Le test conserve un marqueur pour contrôler ensuite la persistance.
 
 ```powershell
 docker compose ps
 docker compose logs --tail=50
-docker compose exec web sh -c 'for f in *.php; do php -l "$f" || exit 1; done'
 python tests/smoke.py
 docker compose down
 docker compose up -d --wait
 python tests/smoke.py --persistence
 ```
 
-Le test ajoute un article unique, controle les champs obligatoires, la longueur, le CSRF, la methode HTTP et l'echappement XSS. Le second passage retrouve le meme article apres recreation des conteneurs. Il laisse cet article dans la base pour la demonstration. `down` preserve le volume ; **`down -v` efface definitivement la base**.
+J'ai retrouvé l'article après suppression et recréation des conteneurs. `down` conserve le volume ; **`down -v` supprime les données**.
 
-Verifier le reseau et la connectivite (commandes ci-dessous dans Bash / WSL / Git Bash) :
+Pour mes contrôles réseau et de syntaxe, les commandes suivantes s'exécutent dans Bash, WSL ou Git Bash :
 
 ```bash
-docker network ls
 docker network inspect ynov-articles_app-network
 docker compose exec web getent hosts db
 docker compose exec web php -r '$s=fsockopen("db",3306,$errno,$error,5); if (!$s) { exit(1); } echo "TCP OK\n"; fclose($s);'
 docker compose exec web id
-docker compose exec db sh -c 'ps -eo user,comm | grep mariadbd'
+docker compose exec web sh -c 'for f in *.php; do php -l "$f" || exit 1; done'
 ```
 
-MySQL utilise un protocole binaire : `curl http://db:3306` ne teste pas un serveur HTTP. Le test TCP et le healthcheck applicatif PDO sont adaptes. `ping` necessiterait un outil et des capacites supplementaires, inutiles ici.
+Je vérifie la connexion SQL avec PDO et, si nécessaire, une connexion TCP. `curl http://db:3306` ne convient pas : MySQL n'utilise pas HTTP.
 
-## Choix de securite et optimisation
+## Sécurité et optimisation
 
-- Web execute par www-data, racine en lecture seule, toutes les capacites retirees, interdiction de gagner des privileges ; seuls les repertoires temporaires Apache et PHP sont inscriptibles via tmpfs.
-- Apache ecoute sur **8080 dans le conteneur**, choix permettant l'execution non-root sans capacite d'ouverture d'un port privilegie. L'acces demande sur localhost:8080 est conserve.
-- MariaDB utilise son entrypoint officiel pour preparer le volume puis abandonne les privileges root pour le serveur. On ne force pas un USER qui casserait la preparation du volume.
-- Requetes preparees PDO, encodage utf8mb4, echappement HTML, validation serveur, protection CSRF, cookies HttpOnly/SameSite, messages d'erreur generiques.
-- Aucun `chmod 777` : il autoriserait tout utilisateur a modifier les fichiers. Le code appartient a root et est seulement lu par le serveur.
-- Build multi-stage : compilation des extensions dans une etape dediee puis copie des modules/configurations dans le runtime. La base PHP officielle contient deja certains outils : le multi-stage ne garantit donc pas a lui seul une reduction importante. Aucune dependance apt additionnelle ni cache apt ajoute.
-- `.dockerignore` autorise uniquement les sources utiles ; ni secrets, rapport, historique Git ni archives dans le contexte.
-- Les tags de base suivent les correctifs de PHP 8.2 et MariaDB 11.4. Pour une production reproductible, figer les digests apres scan et organiser leur mise a jour.
+- J'exécute le Web sous `www-data`, avec une racine en lecture seule, `cap_drop: ALL` et `no-new-privileges`.
+- J'utilise le port interne 8080 pour éviter un port privilégié. Les fichiers temporaires PHP et Apache sont placés dans `/tmp` en tmpfs.
+- Je conserve l'entrypoint officiel MariaDB : il prépare le volume puis abandonne les privilèges root pour le serveur.
+- J'utilise des requêtes préparées, utf8mb4, l'échappement HTML, la validation serveur et un jeton CSRF. Les cookies sont HttpOnly/SameSite et les erreurs détaillées restent dans les logs.
+- Je n'applique aucun `chmod 777` au code ou aux données, car cela autoriserait tous les utilisateurs à les modifier.
+- J'isole la compilation des extensions dans un build multi-stage et je limite le contexte avec `.dockerignore`. La base PHP conserve certains outils : je ne considère donc pas le multi-stage comme une garantie de forte réduction de taille.
 
-## Scans et comparaison de taille
+J'ai mesuré les tailles locales initiales non compressées sur linux/amd64 : 509 332 368 octets pour la base PHP, 509 645 356 pour le Web et 340 532 266 pour MariaDB. Le surcoût Web est d'environ 0,06 %. Cette mesure compare la base et mon image, sans prétendre mesurer une ancienne image monolithique qui n'était pas fournie.
 
-Avec Trivy installe :
+## Analyse Trivy
+
+J'ai exécuté un scan réel sur les deux images publiées avec le scanner de vulnérabilités et le filtre `HIGH,CRITICAL`. Les résultats complets et leur synthèse se trouvent dans `docs/trivy-web.json`, `docs/trivy-db.json` et `docs/trivy-summary.json`.
+
+| Image | HIGH | CRITICAL | CRITICAL avec correctif | Seuil CI |
+|---|---:|---:|---:|---|
+| Web | 147 | 5 | 4 | Non validé |
+| MariaDB | 25 | 1 | 1 | Non validé |
+
+Le scan s'est exécuté correctement, mais les images nécessitent encore des corrections. Mon seuil CI refuse les vulnérabilités critiques disposant d'un correctif. Les résultats dépendent de la base de vulnérabilités au moment de l'analyse.
+
+Pour reproduire le scan avec Trivy installé :
 
 ```powershell
-trivy image --severity HIGH,CRITICAL ynovlocal/ynov-articles-web:latest
-trivy image --severity HIGH,CRITICAL ynovlocal/ynov-articles-db:latest
-docker image inspect php:8.2-apache --format '{{.Size}}'
-docker image inspect ynovlocal/ynov-articles-web:latest --format '{{.Size}}'
-docker history ynovlocal/ynov-articles-web:latest
+trivy image --scanners vuln --severity HIGH,CRITICAL mouedrhi492/ynov-articles-web:latest
+trivy image --scanners vuln --severity HIGH,CRITICAL mouedrhi492/ynov-articles-db:latest
 ```
 
-Tailles en octets non compresses ; comparer sur la meme architecture. Ne pas annoncer de gain sans mesure. Le pipeline bloque les vulnerabilites critiques disposant d'un correctif ; les vulnerabilites sans correctif restent a examiner dans un scan complet. Reconstruire avec `--pull` pour recuperer les correctifs disponibles.
+## CI/CD et publication
 
-## CI/CD et Docker Hub
+J'ai préparé `.github/workflows/docker.yml` pour les PR, les push sur main/master et les lancements manuels. Il construit les deux images, vérifie PHP, démarre la stack, teste HTTP et la persistance puis exécute Trivy. La publication dépend du succès de ces étapes et n'est pas exécutée pour une PR.
 
-Le workflow `.github/workflows/docker.yml` se declenche sur PR, push main/master et manuellement. Il construit les deux images, valide la syntaxe PHP, demarre la stack, teste HTTP et persistance, puis scanne les deux images. Sur push ou lancement manuel, il publie uniquement apres succes, avec `latest` et le SHA complet du commit. Les PR ne recoivent pas les identifiants de publication.
+J'ai publié manuellement les deux images avec Podman, sous les tags `latest` et `8d39914b870aee697761d49b1a947eefedbd5786` :
 
-Creer deux depots publics Docker Hub : `ynov-articles-web` et `ynov-articles-db`. Ajouter dans les secrets GitHub Actions `DOCKERHUB_USERNAME` et `DOCKERHUB_TOKEN` (jeton Docker Hub avec droit d'ecriture). Le ZIP ne contient aucun mot de passe ni jeton. Les deux images sont deja publiees publiquement sous mouedrhi492 avec latest et le SHA 8d39914b870aee697761d49b1a947eefedbd5786. Preuve de verification publique : docs/publication.json. La creation du depot GitHub et sa configuration de secrets restent a effectuer.
+- [Image Web](https://hub.docker.com/r/mouedrhi492/ynov-articles-web)
+- [Image MariaDB](https://hub.docker.com/r/mouedrhi492/ynov-articles-db)
 
-Publication manuelle apres avoir renseigne votre pseudo dans `.env` :
+J'ai vérifié leur accessibilité publique et enregistré les digests dans `docs/publication.json`. Le scan a été réalisé après cette publication manuelle. Le pipeline bloquerait actuellement une nouvelle publication avec son seuil de sécurité.
+
+Il me reste à créer le dépôt GitHub distant, y configurer `DOCKERHUB_USERNAME` et `DOCKERHUB_TOKEN`, puis exécuter le workflow à distance. L'archive ne contient aucun mot de passe ni jeton.
+
+J'ai inclus un dépôt Git portable dans `docs/projet-git.bundle`. Pour récupérer son historique :
 
 ```powershell
-docker login
-docker compose build --pull
-docker compose push
+git clone docs/projet-git.bundle mon-projet
 ```
 
-Initialiser le depot local depuis ce dossier :
+## Déroulé de ma démonstration
 
-```powershell
-git init
-git add .
-git commit -m "feat: containerize PHP articles application"
-git branch -M main
-# Ajouter ensuite votre URL : git remote add origin URL_DU_DEPOT
-git push -u origin main
-```
+1. Je présente les deux services, le réseau et le volume.
+2. Je montre `docker compose ps`, puis je publie un article sur le site.
+3. Je recrée les conteneurs et je montre que l'article est conservé.
+4. Je présente l'utilisateur Web, les secrets et les protections Compose.
+5. Je présente les résultats Trivy et le workflow, avec les corrections et la configuration distante restant à réaliser.
 
-## Soutenance (5 minutes)
+Mon rapport technique PDF, les résultats de validation et les preuves de publication sont regroupés dans `docs/`.
 
-1. Presenter le schema et le role de chaque service, du DNS et du volume.
-2. Montrer `docker compose ps`, ouvrir le site, publier un article.
-3. Executer `down`, puis `up -d --wait`, montrer que l'article reste present.
-4. Montrer l'utilisateur Web, les secrets, le Dockerfile et les protections Compose.
-5. Presenter le workflow et distinguer les verifications locales des executions distantes.
+## Références
 
-Le rapport technique et les preuves de validation disponibles se trouvent dans `docs/`.
-
-## References officielles
-
-- [Image PHP](https://hub.docker.com/_/php)
-- [Image MariaDB](https://hub.docker.com/_/mariadb)
+- [Image officielle PHP](https://hub.docker.com/_/php)
+- [Image officielle MariaDB](https://hub.docker.com/_/mariadb)
 - [Secrets Compose](https://docs.docker.com/compose/how-tos/use-secrets/)
 - [Docker Compose](https://docs.docker.com/compose/)
-
-Un depot Git local portable est inclus dans `docs/projet-git.bundle` (snapshot du rendu). Pour le cloner : `git clone docs/projet-git.bundle mon-projet`. La creation du depot distant reste a faire avec votre compte.
-
-## Images publiees
-
-- https://hub.docker.com/r/mouedrhi492/ynov-articles-web
-- https://hub.docker.com/r/mouedrhi492/ynov-articles-db
-
-Pour utiliser les images publiees sans compiler : `python scripts/setup.py`, puis `docker compose pull` et `docker compose up -d --no-build --wait`.

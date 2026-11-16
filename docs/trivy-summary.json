@@ -1,0 +1,14 @@
+{
+  "web": {
+    "high": 147,
+    "critical": 5,
+    "fixable_critical": 4,
+    "gate": "NON VALIDE"
+  },
+  "db": {
+    "high": 25,
+    "critical": 1,
+    "fixable_critical": 1,
+    "gate": "NON VALIDE"
+  }
+}
