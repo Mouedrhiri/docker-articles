@@ -8,7 +8,9 @@ Validation locale du 16 novembre 2026, Windows / conteneurs Linux amd64 via Podm
 - SQL initialise sur volume neuf ; connexion PDO entre services fonctionnelle.
 - Tailles locales : PHP base 509332368 octets ; Web 509645356 ; DB 340532266.
 - Persistance : voir resultat du test ajoute ci-dessous.
-Limites : scan Trivy non execute localement ; workflow GitHub Actions non execute a distance ; images non publiees sur Docker Hub en absence des identifiants personnels. Les jobs et procedures sont fournis. Aucun resultat de scan ni de publication n est invente.
+Limites : scan Trivy non execute localement ; workflow GitHub Actions non execute a distance. Les jobs et procedures sont fournis. Aucun resultat de scan ni de publication n est invente.
 Compatibilite locale : DOCKER_API_VERSION=1.44 est necessaire avec le client Docker/Compose recent face au socket Podman de cette machine. Aucun reglage de ce type n est requis pour Docker Desktop standard. Les healthchecks sont declares dans Compose car les builds Podman au format OCI ignorent ceux des Dockerfiles.
 
 Resultat final : apres docker-compose down puis recreation, les deux services sont healthy et python tests/smoke.py --persistence passe. L article marque a ete conserve. Healthcheck HTTP curl valide sur la stack.
+
+Publication Docker Hub realisee et verifiee sans authentification pour les deux images mouedrhi492/ynov-articles-web et mouedrhi492/ynov-articles-db. Tags latest et 8d39914b870aee697761d49b1a947eefedbd5786. Digests enregistres dans docs/publication.json. La publication a ete faite manuellement via Podman, pas via une execution distante du pipeline.

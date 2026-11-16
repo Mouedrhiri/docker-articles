@@ -35,7 +35,7 @@ Les deux services partagent le bridge personnalise `app-network`. Seul le Web pu
 | WEB_PORT | 8080 | Port local HTTP |
 | DB_NAME | articles | Base initialisee |
 | DB_USER | articles_app | Compte applicatif limite a cette base |
-| DOCKERHUB_USERNAME | ynovlocal | Prefixe des images |
+| DOCKERHUB_USERNAME | mouedrhi492 | Prefixe des images |
 | IMAGE_TAG | latest | Tag construit/utilise |
 
 `scripts/setup.py` copie `.env.example` vers `.env` et genere deux secrets aleatoires dans `secrets/`. Il preserve les fichiers existants. Ces fichiers restent sur l'hote ; Compose les monte en lecture seule dans `/run/secrets/`. Ce mecanisme local ne chiffre pas les fichiers au repos : proteger l'acces au dossier hote. Les fichiers sont lisibles dans le conteneur par www-data. Ne pas partager les secrets.
@@ -98,7 +98,7 @@ Tailles en octets non compresses ; comparer sur la meme architecture. Ne pas ann
 
 Le workflow `.github/workflows/docker.yml` se declenche sur PR, push main/master et manuellement. Il construit les deux images, valide la syntaxe PHP, demarre la stack, teste HTTP et persistance, puis scanne les deux images. Sur push ou lancement manuel, il publie uniquement apres succes, avec `latest` et le SHA complet du commit. Les PR ne recoivent pas les identifiants de publication.
 
-Creer deux depots publics Docker Hub : `ynov-articles-web` et `ynov-articles-db`. Ajouter dans les secrets GitHub Actions `DOCKERHUB_USERNAME` et `DOCKERHUB_TOKEN` (jeton Docker Hub avec droit d'ecriture). Le ZIP ne contient aucun identifiant personnel. La publication distante et la creation du depot GitHub necessitent votre compte.
+Creer deux depots publics Docker Hub : `ynov-articles-web` et `ynov-articles-db`. Ajouter dans les secrets GitHub Actions `DOCKERHUB_USERNAME` et `DOCKERHUB_TOKEN` (jeton Docker Hub avec droit d'ecriture). Le ZIP ne contient aucun mot de passe ni jeton. Les deux images sont deja publiees publiquement sous mouedrhi492 avec latest et le SHA 8d39914b870aee697761d49b1a947eefedbd5786. Preuve de verification publique : docs/publication.json. La creation du depot GitHub et sa configuration de secrets restent a effectuer.
 
 Publication manuelle apres avoir renseigne votre pseudo dans `.env` :
 
@@ -135,3 +135,12 @@ Le rapport technique et les preuves de validation disponibles se trouvent dans `
 - [Image MariaDB](https://hub.docker.com/_/mariadb)
 - [Secrets Compose](https://docs.docker.com/compose/how-tos/use-secrets/)
 - [Docker Compose](https://docs.docker.com/compose/)
+
+Un depot Git local portable est inclus dans `docs/projet-git.bundle` (snapshot du rendu). Pour le cloner : `git clone docs/projet-git.bundle mon-projet`. La creation du depot distant reste a faire avec votre compte.
+
+## Images publiees
+
+- https://hub.docker.com/r/mouedrhi492/ynov-articles-web
+- https://hub.docker.com/r/mouedrhi492/ynov-articles-db
+
+Pour utiliser les images publiees sans compiler : `python scripts/setup.py`, puis `docker compose pull` et `docker compose up -d --no-build --wait`.

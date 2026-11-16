@@ -12,7 +12,8 @@ Rapport : docs/Rapport-technique.pdf
 Guide complet et soutenance : README.md
 
 Les secrets sont generes automatiquement et ne sont pas dans ce ZIP.
-La publication Docker Hub demande de configurer vos identifiants (README).
+Images deja publiees sur Docker Hub sous mouedrhi492 : voir README et docs/publication.json.
+Sans compiler : python scripts/setup.py puis docker compose pull puis docker compose up -d --no-build --wait.
 Sur cette machine avec Podman : utiliser docker-compose et, dans PowerShell,
 $env:DOCKER_API_VERSION='1.44'
 L application a deja ete lancee localement pendant la verification.

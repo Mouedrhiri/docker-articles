@@ -1,0 +1,22 @@
+{
+  "ynov-articles-web": {
+    "latest": {
+      "digest": "sha256:4eedb7617e2c15f0b490f2684bd6213e2e3c275dbb4776e5147ba8a76a60a4e6",
+      "public_verified": true
+    },
+    "8d39914b870aee697761d49b1a947eefedbd5786": {
+      "digest": "sha256:4eedb7617e2c15f0b490f2684bd6213e2e3c275dbb4776e5147ba8a76a60a4e6",
+      "public_verified": true
+    }
+  },
+  "ynov-articles-db": {
+    "latest": {
+      "digest": "sha256:60fb881629e0a9de44fec92f88d9d1a7b758d2cb7ff3938e25ddb8142dc4c498",
+      "public_verified": true
+    },
+    "8d39914b870aee697761d49b1a947eefedbd5786": {
+      "digest": "sha256:60fb881629e0a9de44fec92f88d9d1a7b758d2cb7ff3938e25ddb8142dc4c498",
+      "public_verified": true
+    }
+  }
+}
