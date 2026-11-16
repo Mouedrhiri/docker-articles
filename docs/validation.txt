@@ -15,6 +15,6 @@ J'ai publié les images mouedrhi492/ynov-articles-web et mouedrhi492/ynov-articl
 
 J'ai ensuite exécuté Trivy sur les deux images publiées. Le Web présente 147 résultats HIGH et 5 CRITICAL, dont 4 critiques avec correctif. MariaDB présente 25 HIGH et 1 CRITICAL, avec correctif. Le scan est terminé, mais le seuil de sécurité CI n'est pas validé. Les rapports complets sont inclus dans docs/.
 
-Je n'ai pas encore exécuté le workflow sur GitHub. La configuration du dépôt distant et de ses secrets, ainsi que la correction des vulnérabilités détectées, restent à effectuer.
+J'ai poussé le code sur github.com/Mouedrhiri/docker-articles et configuré les secrets Docker Hub. Une première exécution du workflow a échoué pendant la préparation à cause d'une référence Trivy inexistante. J'ai corrigé cette référence vers le commit officiel de v0.36.0. Les exécutions sont consultables dans Actions. La correction des vulnérabilités détectées reste à effectuer.
 
 Sur mon environnement Podman, j'utilise DOCKER_API_VERSION=1.44 pour la compatibilité du client Compose. Les healthchecks sont déclarés dans Compose afin de fonctionner aussi avec les images au format OCI.

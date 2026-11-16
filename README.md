@@ -117,9 +117,9 @@ J'ai publié manuellement les deux images avec Podman, sous les tags `latest` et
 
 J'ai vérifié leur accessibilité publique et enregistré les digests dans `docs/publication.json`. Le scan a été réalisé après cette publication manuelle. Le pipeline bloquerait actuellement une nouvelle publication avec son seuil de sécurité.
 
-Il me reste à créer le dépôt GitHub distant, y configurer `DOCKERHUB_USERNAME` et `DOCKERHUB_TOKEN`, puis exécuter le workflow à distance. L'archive ne contient aucun mot de passe ni jeton.
+J'ai publié le code sur https://github.com/Mouedrhiri/docker-articles et configuré les secrets `DOCKERHUB_USERNAME` et `DOCKERHUB_TOKEN`. La première exécution distante a révélé une référence de version Trivy incorrecte ; je l'ai remplacée par le commit officiel de la version v0.36.0. Le résultat des exécutions est consultable dans l'onglet Actions du dépôt. L'archive ne contient aucun mot de passe ni jeton.
 
-J'ai inclus un dépôt Git portable dans `docs/projet-git.bundle`. Pour récupérer son historique :
+Dans l'archive de livraison, j'ai inclus un dépôt Git portable dans `docs/projet-git.bundle`. Pour récupérer son historique :
 
 ```powershell
 git clone docs/projet-git.bundle mon-projet
