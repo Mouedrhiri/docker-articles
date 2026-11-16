@@ -1,0 +1,9 @@
+-- Base et utilisateur crees par l'entrypoint officiel via MARIADB_DATABASE/USER.
+CREATE TABLE IF NOT EXISTS articles (
+ id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+ title VARCHAR(100) NOT NULL,
+ author VARCHAR(100) NOT NULL,
+ date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ content TEXT NOT NULL,
+ PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

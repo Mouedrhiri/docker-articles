@@ -1,0 +1,76 @@
+name: Build, test, scan and publish
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python scripts/setup.py
+      - run: docker compose config --quiet
+      - run: docker compose build --pull
+      - name: PHP syntax
+        run: docker compose run --rm --no-deps web sh -c 'for f in *.php; do php -l "$f" || exit 1; done'
+      - run: docker compose up -d --wait --wait-timeout 180
+      - run: python tests/smoke.py
+      - name: Recreate containers and test persistence
+        run: |
+          docker compose down
+          docker compose up -d --wait --wait-timeout 180
+          python tests/smoke.py --persistence
+      - name: Scan web image
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ynovlocal/ynov-articles-web:latest
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+          severity: CRITICAL
+      - name: Scan database image
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ynovlocal/ynov-articles-db:latest
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+          severity: CRITICAL
+      - name: Logs
+        if: always()
+        run: docker compose logs --no-color
+      - name: Cleanup
+        if: always()
+        run: docker compose down -v
+  publish:
+    needs: test
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - image: ynov-articles-web
+            dockerfile: Dockerfile
+          - image: ynov-articles-db
+            dockerfile: docker/db/Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.image }}:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.image }}:${{ github.sha }}

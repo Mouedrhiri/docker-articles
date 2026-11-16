@@ -1,0 +1,18 @@
+PROJET DOCKER YNOV - DEMARRAGE RAPIDE
+
+1. Installer/demarrer Docker Desktop en mode conteneurs Linux.
+2. Ouvrir un terminal dans ce dossier extrait.
+3. Executer :
+   python scripts/setup.py
+   docker compose up -d --build --wait
+4. Ouvrir http://localhost:8080
+
+Test : python tests/smoke.py
+Rapport : docs/Rapport-technique.pdf
+Guide complet et soutenance : README.md
+
+Les secrets sont generes automatiquement et ne sont pas dans ce ZIP.
+La publication Docker Hub demande de configurer vos identifiants (README).
+Sur cette machine avec Podman : utiliser docker-compose et, dans PowerShell,
+$env:DOCKER_API_VERSION='1.44'
+L application a deja ete lancee localement pendant la verification.

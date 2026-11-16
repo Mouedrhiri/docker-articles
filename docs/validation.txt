@@ -1,0 +1,14 @@
+Validation locale du 16 novembre 2026, Windows / conteneurs Linux amd64 via Podman 5.7.1 et Docker Compose standalone 5.0.2.
+- Construction image Web PHP/Apache : reussie.
+- Construction image MariaDB : reussie.
+- docker-compose config --quiet : reussi.
+- php -l : les quatre fichiers PHP sont valides.
+- Tests HTTP reels : sante, liste, creation, methode 405, CSRF 403, champs invalides 422, longueur et echappement XSS : reussis.
+- Web execute avec uid=33(www-data), racine read_only et cap_drop ALL.
+- SQL initialise sur volume neuf ; connexion PDO entre services fonctionnelle.
+- Tailles locales : PHP base 509332368 octets ; Web 509645356 ; DB 340532266.
+- Persistance : voir resultat du test ajoute ci-dessous.
+Limites : scan Trivy non execute localement ; workflow GitHub Actions non execute a distance ; images non publiees sur Docker Hub en absence des identifiants personnels. Les jobs et procedures sont fournis. Aucun resultat de scan ni de publication n est invente.
+Compatibilite locale : DOCKER_API_VERSION=1.44 est necessaire avec le client Docker/Compose recent face au socket Podman de cette machine. Aucun reglage de ce type n est requis pour Docker Desktop standard. Les healthchecks sont declares dans Compose car les builds Podman au format OCI ignorent ceux des Dockerfiles.
+
+Resultat final : apres docker-compose down puis recreation, les deux services sont healthy et python tests/smoke.py --persistence passe. L article marque a ete conserve. Healthcheck HTTP curl valide sur la stack.
