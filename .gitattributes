@@ -1,0 +1,9 @@
+* text=auto
+*.pdf binary
+*.bundle binary
+*.zip binary
+*.php text eol=lf
+*.sql text eol=lf
+*.py text eol=lf
+*.yml text eol=lf
+Dockerfile text eol=lf
